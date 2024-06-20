@@ -2,6 +2,12 @@
 title: "CITE-seq analysis proof-of-concept"
 author: "Patrick Cherry"
 date: "June 20, 2024"
+categories:
+  - multi-modal analysis
+  - CITE-seq
+  - scRNA-seq
+  - code
+  - data
 mainfont: Helvetica Neue
 format:
   pdf:
@@ -24,7 +30,7 @@ execute:
   freeze: true
 ---
 ```{r setup, echo = FALSE, message = FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse, quietly = TRUE)
 library(patchwork)
 library(fs)
@@ -33,9 +39,9 @@ library(Seurat)
 library(Matrix)
 library(testthat)
 theme_set(theme_light())
-out_path <- path(here(), Sys.Date())
+out_path <- fs::path(here(), Sys.Date())
 file_prefix <- "CITE-seq"
-data_dir <- path(here(), "data", "GSE100866")
+data_dir <- fs::path(here(), "data", "GSE100866")
 ```
 ```{r}
 fs::dir_ls(data_dir) |> fs::path_file()
@@ -57,7 +63,15 @@ Seurat multi-modal clustering
 From [Supplementary Figure 1 CITE-seq library preparation](https://www.nature.com/articles/nmeth.4380#Sec18):
 
  > Illustration of the DNA-barcoded antibodies used in CITE-seq. (b) Antibody-oligonucleotide complexes appear as a high-molecular-weight smear when run on an agarose gel (1). Cleavage of the oligo from the antibody by reduction of the disulfide bond collapses the smear to oligo length (2). (c) Drop-seq beads are microparticles with conjugated oligonucleotides comprising a common PCR handle, a cell barcode, followed by a unique molecular identifier (UMI) and a polyT tail. (d) Schematic illustration of CITE-seq library prep in Drop-seq (downstream of Fig. 1b). Reverse transcription and template switch is performed in bulk after emulsion breakage. After amplification, full length cDNA and antibody-oligo products can be separated by size and amplified independently (also shown in d) (e) Reverse transcription and amplification produces two product populations with distinct sizes (left panel). These can be size separated and amplified independently to obtain full length cDNAs (top panel, capillary electrophoresis trace) and ADTs (bottom panel, capillary electrophoresis trace).
- 
+
+```{r eval = FALSE}
+#| eval: FALSE
+source("CITE-seq_data_fetch.R")
+```
+```{r}
+cat(readLines("CITE-seq_data_fetch.R"), sep = "\n")
+```
+
 ## Read in data
 ### count data
 ```{r}
@@ -126,9 +140,14 @@ cbmc <- ScaleData(cbmc)
 ```
 
 ```{r}
+#| label: elbowplot
+#| fig-cap: "Elbow plot of principle components computed from scRNA-seq counts"
+
 cbmc <- RunPCA(cbmc, verbose = FALSE)
 ElbowPlot(cbmc, ndims = 50)
 ```
+
+The elbow plot above shows some interesting PC influence behavior. There are some clusters PCs (like 4-7, 8-10, and 11-13) that make it less clear where the "elbow" of influence trend is. To be very safe, we can keep up to PC 25, where the trend approaches a horizontal line.
 
 ```{r}
 cbmc <- FindNeighbors(cbmc, dims = 1:25)
@@ -137,20 +156,30 @@ cbmc <- FindClusters(cbmc, resolution = 0.8)
 ```{r}
 cbmc <- RunTSNE(cbmc, dims = 1:25, method = "FIt-SNE")
 ```
-```{r message = FALSE}
+```{r}
+#| message: FALSE
 cbmc_rna_markers <-
   FindAllMarkers(cbmc,
                  max.cells.per.ident = 100, logfc.threshold = log(2),
                  only.pos = TRUE, min.diff.pct = 0.3, verbose = FALSE)
 ```
 
+The following cluster identities are provided for us from the authors of the paper. A cell-type classifier would need to be run on the data to label the barcodes (droplets) with their identifiers.
+```{r}
+new.cluster.ids <- c("Memory CD4 T", "CD14+ Mono", "Naive CD4 T", "NK", "CD14+ Mono",
+                    "Mouse", "B", "CD8 T", "CD16+ Mono", "T/Mono doublets", "NK", "CD34+",
+                    "Multiplets", "Mouse", "Eryth", "Mk", "Mouse", "DC", "pDCs")
+names(new.cluster.ids) <- levels(cbmc)
+cbmc <- RenameIdents(cbmc, new.cluster.ids)
+```
+
+
 ### Clustering t-SNE plot
 ```{r}
-#new.cluster.ids <- c("Memory CD4 T", "CD14+ Mono", "Naive CD4 T", "NK", "CD14+ Mono",
-#                     "Mouse", "B", "CD8 T", "CD16+ Mono", "T/Mono doublets", "NK", "CD34+",
-#                     "Multiplets", "Mouse", "Eryth", "Mk", "Mouse", "DC", "pDCs")
-#names(new.cluster.ids) <- levels(cbmc)
-#cbmc <- RenameIdents(cbmc, new.cluster.ids)
+#| label: tsne-plot-rna
+#| fig-height: 4
+#| fig-width: 7
+#| fig-cap: "t-SNE plot of scRNA-seq expression levels showing 18 clusters"
 
 DimPlot(cbmc, label = TRUE, reduction = "tsne")# + NoLegend()
 ```
@@ -184,9 +213,80 @@ cbmc <- ScaleData(cbmc, assay = "ADT")
 DefaultAssay(cbmc) <- "RNA"
 ```
 
+### Visualize protein levels on RNA clusters
 ```{r}
-FeaturePlot(cbmc, features = c("adt_CD3", "adt_CD11c", "adt_CD8",
-                               "adt_CD16", "CD3E", "ITGAX", "CD8A", "FCGR3A"),
+#| fig-height: 7
+#| fig-width: 14
+FeaturePlot(cbmc, features = c("adt_CD3", "adt_CD11c", "adt_CD8", "adt_CD16",
+                               "CD3E", "ITGAX", "CD8A", "FCGR3A"),
             min.cutoff = "q05", max.cutoff = "q95", ncol = 4)
 ```
+
+```{r}
+#| fig-height: 7
+#| fig-width: 18
+# Compare gene and protein expression levels for the other 6 antibodies.
+FeaturePlot(cbmc,
+            features = c("adt_CD4", "adt_CD45RA", "adt_CD56",
+                         "adt_CD14", "adt_CD19", "adt_CD34",
+                         "CD4", "PTPRC", "NCAM1",
+                         "CD14", "CD19", "CD34"),
+            min.cutoff = "q05", max.cutoff = "q95", ncol = 6)
+```
+
+```{r}
+#| fig-width: 7.5
+#| fig-height: 9
+#| message: FALSE
+RidgePlot(cbmc, features = c("adt_CD3", "adt_CD11c", "adt_CD8", "adt_CD16"), ncol = 2)
+```
+
+```{r}
+FeatureScatter(cbmc, feature1 = "adt_CD19", feature2 = "adt_CD3")
+```
+
+```{r}
+FeatureScatter(cbmc, feature1 = "adt_CD3", feature2 = "CD3E")
+```
+
+```{r}
+FeatureScatter(cbmc, feature1 = "adt_CD4", feature2 = "CD4")
+```
+
+### T-cell analysis
+```{r}
+tcells <- subset(cbmc, idents = c("Naive CD4 T", "Memory CD4 T", "CD8 T"))
+FeatureScatter(tcells, feature1 = "adt_CD4", feature2 = "adt_CD8")
+```
+
+The pearson correlation of CD4 and CD8 antibody CITE-seq signal is -0.79, indicating these are signals are significantly anti-correlated, which is consistent with the immunology of T-cells.
+
+```{r}
+FeatureScatter(tcells, feature1 = "adt_CD4", feature2 = "adt_CD8", slot = "counts")
+```
+
+```{r}
+FeatureScatter(tcells, feature1 = "CD4", feature2 = "CD8A");
+```
+
+```{r}
+ncol(subset(tcells, subset = CD4 == 0 & CD8A == 0)) / ncol(tcells)
+```
+
+Wow, when measured by RNA expression, 83% of the T-cells are double-negative for CD4 and CD8.
+
+```{r}
+DefaultAssay(tcells) <- "ADT"  # work with ADT count matrix
+FeatureScatter(tcells, feature1 = "adt_CD4", feature2 = "adt_CD8")
+```
+```{r}
+ncol(subset(tcells, subset = adt_CD4 < 1 & adt_CD8 < 1)) / ncol(tcells)
+```
+
+However, for surface antigen detection in CITE-seq, only 0.997% are double negative for CD4 protein and CD8 protein.
+
+
+
+
+
 

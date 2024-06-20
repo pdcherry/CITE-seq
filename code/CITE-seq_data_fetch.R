@@ -11,5 +11,6 @@ gse <- getGEO(gse_id, GSEMatrix = TRUE)
 show(gse)
 
 filePaths <- getGEOSuppFiles(gse_id)
-#filePaths
-fs::file_move(path(gse_id), "data")
+
+fs::file_delete(fs::path("data", gse_id, fs::path_file(fs::dir_ls(gse_id))))
+fs::file_move(fs::path(gse_id), "data")
