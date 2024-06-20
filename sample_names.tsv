@@ -1,0 +1,14 @@
+# https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE100866
+# https://www.nature.com/articles/nmeth.4380#article-info
+GSM2695379  ADT: CBMC_8K_13AB_10x
+GSM2695380  RNA: CBMC_8K_13AB_10x
+GSM2695381  ADT: PBMC_vs_flow_10x
+GSM2695382  RNA: PBMC_vs_flow_10x
+GSM2695383  ADT: CD8_off_Dropseq
+GSM2695384  RNA: CD8_off_Dropseq
+GSM2695385  ADT: CD8_intermediate_Dropseq
+GSM2695386  RNA: CD8_intermediate_Dropseq
+GSM2695387  ADT: CD8_low_Dropseq
+GSM2695388  RNA: CD8_low_Dropseq
+GSM2695389  ADT: CD8_high_Dropseq
+GSM2695390  RNA: CD8_high_Dropseq

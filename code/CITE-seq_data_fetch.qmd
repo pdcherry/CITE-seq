@@ -1,0 +1,50 @@
+---
+title: "CITE-seq "
+author: "Patrick Cherry"
+date: "June 20, 2024"
+mainfont: Helvetica Neue
+format:
+  gfm:
+    toc: TRUE
+    toc-depth: 2
+    output-file: "README.md"
+  pdf:
+    output-file: "CITE-seq-analysis.pdf"
+    df-print: kable
+    toc: FALSE
+    toc-depth: 2
+    fontsize: "8"
+    fig-align: center
+    fig-height: 2.5
+    geometry:
+    - top = 10mm
+    - bottom = 20mm
+    - left = 15mm
+    - right = 15mm
+execute:
+  freeze: true
+---
+```{r setup, echo = FALSE, message = FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse, quietly = TRUE)
+library(patchwork)
+library(fs)
+library(here)
+theme_set(theme_light())
+out_path <- path(here(), Sys.Date())
+file_prefix <- "CITE-seq"
+```
+
+```{r}
+path(out_path, file_prefix)
+```
+
+## Intro
+CITE-seq using data from Stoeckius, et al (Nat Methods 14, 865–868 (2017) 10.1038/nmeth.4380) in GSE100866
+
+### Methods Intro
+From [Supplementary Figure 1 CITE-seq library preparation](https://www.nature.com/articles/nmeth.4380#Sec18):
+
+ > Illustration of the DNA-barcoded antibodies used in CITE-seq. (b) Antibody-oligonucleotide complexes appear as a high-molecular-weight smear when run on an agarose gel (1). Cleavage of the oligo from the antibody by reduction of the disulfide bond collapses the smear to oligo length (2). (c) Drop-seq beads are microparticles with conjugated oligonucleotides comprising a common PCR handle, a cell barcode, followed by a unique molecular identifier (UMI) and a polyT tail. (d) Schematic illustration of CITE-seq library prep in Drop-seq (downstream of Fig. 1b). Reverse transcription and template switch is performed in bulk after emulsion breakage. After amplification, full length cDNA and antibody-oligo products can be separated by size and amplified independently (also shown in d) (e) Reverse transcription and amplification produces two product populations with distinct sizes (left panel). These can be size separated and amplified independently to obtain full length cDNAs (top panel, capillary electrophoresis trace) and ADTs (bottom panel, capillary electrophoresis trace).
+ 
+ 
