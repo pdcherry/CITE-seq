@@ -285,8 +285,127 @@ ncol(subset(tcells, subset = adt_CD4 < 1 & adt_CD8 < 1)) / ncol(tcells)
 
 However, for surface antigen detection in CITE-seq, only 0.997% are double negative for CD4 protein and CD8 protein.
 
+## differential protein levels between clusters
+Here, I sample 300 sells
+```{r}
+cbmc_subset <- subset(cbmc, downsample = 300)
 
+# Find protein markers for all clusters, and draw a heatmap
+adt_markers <- FindAllMarkers(cbmc_subset, assay = "ADT", only.pos = TRUE)
+```
 
+```{r}
+#| fig-height: 8
+#| fig-width: 7
+DoHeatmap(cbmc_subset,
+          features = unique(adt_markers$gene),
+          assay = "ADT", angle = 90, size = 4) +
+  #NoLegend() +
+  guides(color = "none") +
+  theme(axis.text.y = element_text(size = 14),
+        strip.text = element_text(size = 2))
+```
 
+### Cluster directly on protein levels
+Keeping human cells only:
+```{r}
+cbmc <- subset(cbmc, idents = c("Multiplets", "Mouse"), invert = TRUE)
+```
+```{r}
+DefaultAssay(cbmc) <- "ADT"
+cbmc <-
+  RunPCA(cbmc,
+         features = rownames(cbmc),
+         reduction.name = "pca_adt", reduction.key = "pcaadt_",
+         verbose = FALSE)
+```
 
+I'm using `reduction.name` and `reduction.key`, because this is the second PCA being run on this multi-modal Seurat object, and I don't want the names to collide with the scRNA-seq PCA.
+
+```{r}
+DimPlot(cbmc, reduction = "pca_adt")
+```
+
+```{r}
+ElbowPlot(cbmc)
+```
+
+```{r}
+adt_data <- GetAssayData(cbmc, slot = "data")
+adt_dist <- dist(t(adt_data))
+
+cbmc[["rnaClusterID"]] <- Idents(cbmc)
+```
+
+```{r}
+cbmc[["tsne_adt"]] <- RunTSNE(adt_dist, assay = "ADT", reduction.key = "adtTSNE_")
+cbmc[["adt_snn"]] <- FindNeighbors(adt_dist)$snn
+```
+
+```{r}
+cbmc <- FindClusters(cbmc, resolution = 0.2, graph.name = "adt_snn")
+```
+
+```{r}
+( clustering_table <- table(Idents(cbmc), cbmc$rnaClusterID) )
+```
+
+```{r}
+# new_cluster_ids <- c("CD4 T", "CD14+ Mono", "NK", "B",
+#                      "CD8 T", "NK", "CD34+", "T/Mono doublets",
+#                      "CD16+ Mono", "pDCs", "B")
+
+new_cluster_ids <- levels(unique(cbmc$rnaClusterID))
+
+names(new_cluster_ids) <- levels(cbmc)
+```
+
+```{r}
+levels(unique(cbmc$rnaClusterID))
+```
+
+```{r}
+names(new_cluster_ids)
+```
+
+```{r}
+levels(cbmc)
+```
+
+```{r}
+cbmc <- RenameIdents(cbmc, new_cluster_ids)
+```
+
+```{r}
+#| label: pairedtSNE
+#| fig-cap: Juxaposed tSNE plots of ADT (antibody) signal, colored and labeled by the data source indicated in the title.
+#| fig-width: 8
+#| fig-height: 5.5
+ 
+tsne_rnaClusters <- DimPlot(cbmc, reduction = "tsne_adt", group.by = "rnaClusterID", pt.size = 0.5) +
+  NoLegend() +
+  ggtitle("Classification based on scRNA-seq") +
+  theme(plot.title = element_text(size = 12, hjust = 0.5))
+
+tsne_rnaClusters <- LabelClusters(plot = tsne_rnaClusters, id = "rnaClusterID", size = 4)
+
+tsne_adtClusters <- DimPlot(cbmc, reduction = "tsne_adt", pt.size = 0.5) +
+  NoLegend() +
+  ggtitle("Classification based on ADT signal") +
+  theme(plot.title = element_text(size = 12, hjust = 0.5))
+
+tsne_adtClusters <- LabelClusters(plot = tsne_adtClusters, id = "ident", size = 4)
+
+# Note: for this comparison, both the RNA and protein clustering are visualized on a tSNE
+# generated using the ADT distance matrix.
+patchwork::wrap_plots(list(tsne_rnaClusters, tsne_adtClusters), ncol = 2) +
+  plot_annotation(tag_levels = 'a')
+```
+
+The tSNE clustering above is based on the distance matrix ADT (antibody) signal, whereas the coloring and cluster labels are, on the scRNA-seq data.
+
+Overall, the ADT-driven clustering yields similar results. The compare / contrast are:
+  - ADT clustering is improves CD4/CD8 T cell group distinction, based on the robust ADT data for CD4, CD8, CD14, and CD45RA
+  - However, ADT-based clustering is worse for the Mk/Ery/DC cell-surface markers, and scRNA-seq distinguishes these populations better.
+  - Some of the clusters are likely doublets, which have low confidence classifier calls in both the scRNA-seq and ADT methods. (However, scRNA-seq could have more features for more confident doublet identification and removal.)
 
