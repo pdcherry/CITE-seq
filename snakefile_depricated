@@ -1,0 +1,16 @@
+def get_accession_ids(txt_file):
+    accession_file  = open(txt_file, 'r')
+    accession_id_list = []
+
+    accession_id_list = accession_file.readlines()
+    
+    accession_file.close()
+    
+    return(accession_id_list)
+
+rule download-files:
+    input: accessions = get_accession_ids('accession_id.txt')
+    output:  expand(["../data/inputfile{dataset}/*.{ext}"],
+        dataset=DATASETS, ext=FORMATS)
+    shell: "Rscript code/CITE-seq_data_fetch.R"
+    
