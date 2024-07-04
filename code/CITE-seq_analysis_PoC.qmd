@@ -41,35 +41,19 @@ library(testthat)
 theme_set(theme_light())
 out_path <- fs::path(here(), Sys.Date())
 file_prefix <- "CITE-seq"
-data_dir <- fs::path(here(), "data", "GSE100866")
-```
-```{r}
-fs::dir_ls(data_dir) |> fs::path_file()
+data_dir <- fs::path("~/", "pdcherry_github_data", "CITE-seq_data", "GSE100866")
 ```
 
-```{r}
-path(out_path, file_prefix)
-```
-
-## Intro
-CITE-seq using data from Stoeckius, et al (Nat Methods 14, 865–868 (2017) 10.1038/nmeth.4380) in GSE100866
-
-Seurat multi-modal clustering
-
-<!-- https://cran.r-project.org/web/packages/dsb/vignettes/end_to_end_workflow.html -->
-<!-- https://broadinstitute.github.io/2020_scWorkshop/cite-seq.html -->
-
-### Methods Intro
-From [Supplementary Figure 1 CITE-seq library preparation](https://www.nature.com/articles/nmeth.4380#Sec18):
-
- > Illustration of the DNA-barcoded antibodies used in CITE-seq. (b) Antibody-oligonucleotide complexes appear as a high-molecular-weight smear when run on an agarose gel (1). Cleavage of the oligo from the antibody by reduction of the disulfide bond collapses the smear to oligo length (2). (c) Drop-seq beads are microparticles with conjugated oligonucleotides comprising a common PCR handle, a cell barcode, followed by a unique molecular identifier (UMI) and a polyT tail. (d) Schematic illustration of CITE-seq library prep in Drop-seq (downstream of Fig. 1b). Reverse transcription and template switch is performed in bulk after emulsion breakage. After amplification, full length cDNA and antibody-oligo products can be separated by size and amplified independently (also shown in d) (e) Reverse transcription and amplification produces two product populations with distinct sizes (left panel). These can be size separated and amplified independently to obtain full length cDNAs (top panel, capillary electrophoresis trace) and ADTs (bottom panel, capillary electrophoresis trace).
-
-```{r eval = FALSE}
+```{r eval = FALSE, include = FALSE}
 #| eval: FALSE
 source("CITE-seq_data_fetch.R")
 ```
 ```{r}
 cat(readLines("CITE-seq_data_fetch.R"), sep = "\n")
+```
+
+```{r}
+fs::dir_ls(data_dir) |> fs::path_file()
 ```
 
 ## Read in data
@@ -85,7 +69,7 @@ cbmc_rna <-
 dim(cbmc_rna)
 ```
 
-`dim()` outputs (columns, rows); the CBMC matrix (cord blood mononuclear cells) contains 36280 features and 8617 samples (single cell droplets).
+`dim()` outputs (columns, rows); the CBMC matrix (cord blood mono-nuclear cells) contains 36280 features and 8617 samples (single cell droplets).
 
 ```{r}
 cbmc_rna <- CollapseSpeciesExpressionMatrix(cbmc_rna,
@@ -140,8 +124,8 @@ cbmc <- ScaleData(cbmc)
 ```
 
 ```{r}
-#| label: elbowplot
-#| fig-cap: "Elbow plot of principle components computed from scRNA-seq counts"
+#| label: fig-cbmc-elbowplot
+#| fig-cap: Elbow plot or scree plot of principle components computed from scRNA-seq counts
 
 cbmc <- RunPCA(cbmc, verbose = FALSE)
 ElbowPlot(cbmc, ndims = 50)
@@ -164,7 +148,7 @@ cbmc_rna_markers <-
                  only.pos = TRUE, min.diff.pct = 0.3, verbose = FALSE)
 ```
 
-The following cluster identities are provided for us from the authors of the paper. A cell-type classifier would need to be run on the data to label the barcodes (droplets) with their identifiers.
+The following cluster identities are provided for us from the authors of the paper. A cell-type classifier would need to be run on the data to label the bar-codes (droplets) with their identifiers.
 ```{r}
 new.cluster.ids <- c("Memory CD4 T", "CD14+ Mono", "Naive CD4 T", "NK", "CD14+ Mono",
                     "Mouse", "B", "CD8 T", "CD16+ Mono", "T/Mono doublets", "NK", "CD34+",
@@ -173,15 +157,14 @@ names(new.cluster.ids) <- levels(cbmc)
 cbmc <- RenameIdents(cbmc, new.cluster.ids)
 ```
 
-
 ### Clustering t-SNE plot
 ```{r}
-#| label: tsne-plot-rna
+#| label: fig-tsne-plot-rna
+#| fig-cap: tSNE plot of clustered and classified scRNA-seq data. The 18 cluster ids provided from authors of paper.
 #| fig-height: 4
 #| fig-width: 7
-#| fig-cap: "t-SNE plot of scRNA-seq expression levels showing 18 clusters"
 
-DimPlot(cbmc, label = TRUE, reduction = "tsne")# + NoLegend()
+DimPlot(cbmc, label = TRUE, reduction = "tsne")
 ```
 
 ## Incorporate protein expression (antibody barcodes) to the Seurat object
@@ -200,7 +183,7 @@ rownames(cbmc_adt)
 
 Now we can repeat the pre-processing (normalization and scaling) steps that we typically run with RNA, but modifying the 'assay' argument.
 
-(For CITE-seq data, the Broad does not recommend typical LogNormalization. Instead, they use a centered log-ratio (CLR) normalization, computed independently for each feature. This is a slightly improved procedure from the original publication.)
+(For CITE-seq data, the Broad does not recommend typical Log-normalization. Instead, they use a centered log-ratio (CLR) normalization, computed independently for each feature. This is a slightly improved procedure from the original publication.)
 
 ```{r}
 cbmc <- NormalizeData(cbmc, assay = "ADT", normalization.method = "CLR")
@@ -215,6 +198,8 @@ DefaultAssay(cbmc) <- "RNA"
 
 ### Visualize protein levels on RNA clusters
 ```{r}
+#| label: fig-adv-rna-tsne-a
+#| fig-cap: "Set I: Juxtaposed heat map of cell-surface antibody-derived signal (top row) versus mRNA-seq (bottom row) of correspoding proteins and their mRNAs"
 #| fig-height: 7
 #| fig-width: 14
 FeaturePlot(cbmc, features = c("adt_CD3", "adt_CD11c", "adt_CD8", "adt_CD16",
@@ -223,6 +208,8 @@ FeaturePlot(cbmc, features = c("adt_CD3", "adt_CD11c", "adt_CD8", "adt_CD16",
 ```
 
 ```{r}
+#| label: fig-adv-rna-tsne-b
+#| fig-cap: "Set II: Juxtaposed heat map of cell-surface antibody-derived signal (top row) versus mRNA-seq (bottom row) of correspoding proteins and their mRNAs"
 #| fig-height: 7
 #| fig-width: 18
 # Compare gene and protein expression levels for the other 6 antibodies.
@@ -234,46 +221,100 @@ FeaturePlot(cbmc,
             min.cutoff = "q05", max.cutoff = "q95", ncol = 6)
 ```
 
-```{r}
+As we can see from the above figures @fig-adv-rna-tsne-a and @fig-adv-rna-tsne-b, in some cases, the same clusters / tSNE neighborhoods have high correspondence for the mRNA and the cell surface protein (*e.g.* CD3, CD4), but the penetrance (proportion of the cells) showing both antibody and mRNA feature may not be 100%; in other cases, some clusters expressing the cell-surface marker do not show much mRNA level (*e.g.* CD11, CD56, CD19, CD34), and vice-versa (*e.g.* CD45RA).
+
+These side-by-side comparison illustrate the strength of the evidence added to the experiment by analyzing for both mRNA and protein.
+
+```{r message = FALSE}
+#| label: fig-adv-rna-joy
+#| fig-cap: "Stacked density plots showing this distribution of antibody-derived tag (ADT) signal in each scRNA-seq cell class for four cell-sirface markers: CD3, CD11c, CD8, and CD16."
 #| fig-width: 7.5
 #| fig-height: 9
 #| message: FALSE
 RidgePlot(cbmc, features = c("adt_CD3", "adt_CD11c", "adt_CD8", "adt_CD16"), ncol = 2)
 ```
 
-```{r}
-FeatureScatter(cbmc, feature1 = "adt_CD19", feature2 = "adt_CD3")
+### Why may these differences occur?
+One reason the "levels" between protein and mRNA could differ is that one of them is samples a very low count, and the normalization is concealing that fact.
+
+```{r message = FALSE}
+#| label: fig-norm-count-compare
+#| fig-cap: "One gene, CD3, displayed as either antibody-derived tags (left side) or mRNA (right side), with x-axis in units of normalized expression (top half) or raw, un-normalized counts (bottom) for all cell classes."
+norm_joy_plot_cd3 <- RidgePlot(cbmc, features = c("adt_CD3", "rna_CD3E"), ncol = 2) +
+  patchwork::plot_annotation(subtitle = "Normalized expression levels")
+count_joy_plot_cd3 <- RidgePlot(cbmc, features = c("adt_CD3", "rna_CD3E"), ncol = 2, layer = "counts") +
+  patchwork::plot_annotation(subtitle = "Un-normalized NGS counts")
+
+patchwork_plot_cd3 <- norm_joy_plot_cd3 / count_joy_plot_cd3
+
+(patchwork_plot_cd3 <- patchwork_plot_cd3 +
+  patchwork::plot_annotation(title = "Comparison of normalized and count data",
+                             tag_levels = "a") &
+    theme(axis.text = element_text(size = 5))
+  )
 ```
 
-```{r}
-FeatureScatter(cbmc, feature1 = "adt_CD3", feature2 = "CD3E")
-```
+As @fig-norm-count-compare shows, the raw counts (which are UMI-collapsed) of the antibody-derived tags has a very large dynamic range with large values (around 1000 to 2000 counts) for positive cells, whereas the mRNA raw counts shows discretization close to 0, with the plurality of cells in each classification having 0 counts, followed by 1, then 2, then 3... counts. This shows that a low number of mRNA molecules either present in the cells (or incorporated into the single cell NGS library) is limiting the *sensitivity* of the scRNA-seq method at identifying key transcripts in the cells; ADTs have far less of this problem, where there is a large difference (from ~ 0 to about 1000 counts) between negative and positive cells, suggesting the antibody method is less susceptible to Poisson / binomial sampling noise and uncertainty.
 
 ```{r}
-FeatureScatter(cbmc, feature1 = "adt_CD4", feature2 = "CD4")
+#| label: fig-cd3-cd19-cor
+#| fig-cap: "Scatter plot showing the correlation (in title) of CD3 vs CD19 antibody-derived tag (ADT) signal across ovserved cells."
+FeatureScatter(cbmc, feature1 = "adt_CD19", feature2 = "adt_CD3", pt.size = 0.5, shuffle = TRUE)
+```
+
+@fig-cd3-cd19-cor shows that CD3 and CD19 are poorly correlated, with CD19 displaying high antibody signal in B cells, and CD3 showing higher signals in the T-cell classes (memory CD4+ T cells, naive CD4 T cells, and some T cell - monocyte doublets). This scatter plot of ADTs could function similarly to a flow plot, complete with gates.
+
+```{r}
+#| label: fig-cd3-cd4-cor
+#| fig-cap: "Scatter plot showing the correlation (in title) of ADT to mRNA expression for CD3 and CD4 using both normalized data and direct count data"
+patchwork_cor_plots <- (
+  FeatureScatter(cbmc, feature1 = "adt_CD3", feature2 = "rna_CD3E", pt.size = 0.5, shuffle = TRUE, combine = TRUE) /
+  FeatureScatter(cbmc, slot = "counts", feature1 = "adt_CD3", feature2 = "rna_CD3E",
+                                        pt.size = 0.5, jitter = TRUE, combine = TRUE)
+  ) | (
+    FeatureScatter(cbmc, feature1 = "adt_CD4", feature2 = "rna_CD4", pt.size = 0.5, shuffle = TRUE, combine = TRUE) /
+    FeatureScatter(cbmc, slot = "counts", feature1 = "adt_CD4", feature2 = "rna_CD4", pt.size = 0.5, jitter = TRUE, combine = TRUE)
+    )
+(patchwork_cor_plots <- patchwork_cor_plots +
+    patchwork::plot_annotation(title = "Comparison of normalized and count data in scatter plot with correlation",
+                             tag_levels = "a") +
+    plot_layout(guides = "collect"))
 ```
 
 ### T-cell analysis
 ```{r}
+#| label: fig-cd4-cd8-adt-scatters
+#| fig-cap: "Scatter plot of antibody-derived tags (ADT) for CD4 and CD8 receptors, with normalized data in (a) and raw counts in (b)"
 tcells <- subset(cbmc, idents = c("Naive CD4 T", "Memory CD4 T", "CD8 T"))
-FeatureScatter(tcells, feature1 = "adt_CD4", feature2 = "adt_CD8")
-```
 
-The pearson correlation of CD4 and CD8 antibody CITE-seq signal is -0.79, indicating these are signals are significantly anti-correlated, which is consistent with the immunology of T-cells.
-
-```{r}
-FeatureScatter(tcells, feature1 = "adt_CD4", feature2 = "adt_CD8", slot = "counts")
-```
-
-```{r}
-FeatureScatter(tcells, feature1 = "CD4", feature2 = "CD8A");
+(FeatureScatter(tcells, feature1 = "adt_CD4", feature2 = "adt_CD8") |
+  FeatureScatter(tcells, feature1 = "adt_CD4", feature2 = "adt_CD8", slot = "counts") ) +
+  patchwork::plot_annotation(title = "Comparison of normalized and count data",
+                             tag_levels = "a") +
+    plot_layout(guides = "collect")
 ```
 
 ```{r}
-ncol(subset(tcells, subset = CD4 == 0 & CD8A == 0)) / ncol(tcells)
+ncol(subset(tcells, subset = adt_CD4 < 1 & adt_CD8 < 1)) / ncol(tcells)
 ```
 
-Wow, when measured by RNA expression, 83% of the T-cells are double-negative for CD4 and CD8.
+In @fig-cd4-cd8-adt-scatters, the pearson correlation of CD4 and CD8 antibody CITE-seq signal is -0.79, indicating these are signals are significantly anti-correlated, which is consistent with the immunology of T cells vs B cells. While the normalized data (a) look pretty separate / disjoint, the count data (b) are even more orthogonal, though there is less space separating the clusters in b than in a.
+
+```{r}
+#| label: fig-cd4-cd8-rna-scatters
+#| fig-cap: "Scatter plot of mRNA expression for CD4 and CD8, with normalized data in (a) and raw counts in (b)"
+(FeatureScatter(tcells, feature1 = "rna_CD4", feature2 = "rna_CD8A", jitter = TRUE) |
+   FeatureScatter(tcells, feature1 = "rna_CD4", feature2 = "rna_CD8A", slot = "counts", jitter = TRUE)) +
+    patchwork::plot_annotation(title = "Comparison of normalized (a) and count data (b) of mRNA expression",
+                             tag_levels = "a") +
+    plot_layout(guides = "collect")
+```
+
+```{r}
+ncol(subset(tcells, subset = rna_CD4 == 0 & rna_CD8A == 0)) / ncol(tcells)
+```
+
+The above plot @fig-cd4-cd8-rna-scatters shows the weakness of attempting to classify immune cells by rarely-expressed mRNAs alone (despite the corresponding gene product being definitional to the cell class) when measured by RNA expression; As high as 83% of the T-cells are double-negative for CD4 and CD8.
 
 ```{r}
 DefaultAssay(tcells) <- "ADT"  # work with ADT count matrix
@@ -285,8 +326,8 @@ ncol(subset(tcells, subset = adt_CD4 < 1 & adt_CD8 < 1)) / ncol(tcells)
 
 However, for surface antigen detection in CITE-seq, only 0.997% are double negative for CD4 protein and CD8 protein.
 
-## differential protein levels between clusters
-Here, I sample 300 sells
+## Differential protein levels between clusters
+Here, I sample 300 cells per cluster to enhance visualization.
 ```{r}
 cbmc_subset <- subset(cbmc, downsample = 300)
 
@@ -300,11 +341,12 @@ adt_markers <- FindAllMarkers(cbmc_subset, assay = "ADT", only.pos = TRUE)
 DoHeatmap(cbmc_subset,
           features = unique(adt_markers$gene),
           assay = "ADT", angle = 90, size = 4) +
-  #NoLegend() +
   guides(color = "none") +
   theme(axis.text.y = element_text(size = 14),
         strip.text = element_text(size = 2))
 ```
+
+The unknown cells co-express both myeloid and lymphoid markers (true at the RNA level as well). They are likely cell clumps / multiplets that should be discarded.
 
 ### Cluster directly on protein levels
 Keeping human cells only:
@@ -331,7 +373,7 @@ ElbowPlot(cbmc)
 ```
 
 ```{r}
-adt_data <- GetAssayData(cbmc, slot = "data")
+adt_data <- GetAssayData(cbmc, layer = "data")
 adt_dist <- dist(t(adt_data))
 
 cbmc[["rnaClusterID"]] <- Idents(cbmc)
@@ -350,11 +392,13 @@ cbmc <- FindClusters(cbmc, resolution = 0.2, graph.name = "adt_snn")
 ( clustering_table <- table(Idents(cbmc), cbmc$rnaClusterID) )
 ```
 
-```{r}
-# new_cluster_ids <- c("CD4 T", "CD14+ Mono", "NK", "B",
-#                      "CD8 T", "NK", "CD34+", "T/Mono doublets",
-#                      "CD16+ Mono", "pDCs", "B")
+<!-- ```{r} -->
+<!-- # new_cluster_ids <- c("CD4 T", "CD14+ Mono", "NK", "B", -->
+<!-- #                      "CD8 T", "NK", "CD34+", "T/Mono doublets", -->
+<!-- #                      "CD16+ Mono", "pDCs", "B") -->
+<!-- ``` -->
 
+```{r}
 new_cluster_ids <- levels(unique(cbmc$rnaClusterID))
 
 names(new_cluster_ids) <- levels(cbmc)
@@ -377,11 +421,11 @@ cbmc <- RenameIdents(cbmc, new_cluster_ids)
 ```
 
 ```{r}
-#| label: pairedtSNE
-#| fig-cap: Juxaposed tSNE plots of ADT (antibody) signal, colored and labeled by the data source indicated in the title.
+#| label: fig-pairedtSNE
+#| fig-cap: Juxtaposed tSNE plots of ADT (antibody) signal, colored and labeled by the data source indicated in the title (classification based on scRNA-seq in a; classification based on ADT signal in b).
 #| fig-width: 8
 #| fig-height: 5.5
- 
+
 tsne_rnaClusters <- DimPlot(cbmc, reduction = "tsne_adt", group.by = "rnaClusterID", pt.size = 0.5) +
   NoLegend() +
   ggtitle("Classification based on scRNA-seq") +
@@ -398,14 +442,18 @@ tsne_adtClusters <- LabelClusters(plot = tsne_adtClusters, id = "ident", size = 
 
 # Note: for this comparison, both the RNA and protein clustering are visualized on a tSNE
 # generated using the ADT distance matrix.
-patchwork::wrap_plots(list(tsne_rnaClusters, tsne_adtClusters), ncol = 2) +
-  plot_annotation(tag_levels = 'a')
+( tsne_rna_adtClusters <- patchwork::wrap_plots(list(tsne_rnaClusters, tsne_adtClusters), ncol = 2) +
+  plot_annotation(tag_levels = 'a') )
+```
+```{r eval = FALSE, include = FALSE}
+ggsave(fs::path(out_path, "tsne_rna_adtClusters.png"), tsne_rna_adtClusters,
+       dpi = 320, units = "in", width = 906/72/1.5, height = 603/72/1.5)
 ```
 
-The tSNE clustering above is based on the distance matrix ADT (antibody) signal, whereas the coloring and cluster labels are, on the scRNA-seq data.
+The tSNE clustering in @fig-pairedtSNE above is based on the distance matrix ADT (antibody) signal, whereas the coloring and cluster labels are, on the scRNA-seq data.
 
-Overall, the ADT-driven clustering yields similar results. The compare / contrast are:
-  - ADT clustering is improves CD4/CD8 T cell group distinction, based on the robust ADT data for CD4, CD8, CD14, and CD45RA
+Overall, the ADT-driven clustering yields similar results. The compare / contrast conclusions are:
+
+  - ADT clustering improves CD4/CD8 T cell group distinction, based on the robust, high-count ADT data for CD4, CD8, CD14, and CD45RA.
   - However, ADT-based clustering is worse for the Mk/Ery/DC cell-surface markers, and scRNA-seq distinguishes these populations better.
   - Some of the clusters are likely doublets, which have low confidence classifier calls in both the scRNA-seq and ADT methods. (However, scRNA-seq could have more features for more confident doublet identification and removal.)
-

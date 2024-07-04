@@ -634,11 +634,13 @@ signal, whereas the coloring and cluster labels are, on the scRNA-seq
 data.
 
 Overall, the ADT-driven clustering yields similar results. The compare /
-contrast are: - ADT clustering is improves CD4/CD8 T cell group
-distinction, based on the robust ADT data for CD4, CD8, CD14, and
-CD45RA - However, ADT-based clustering is worse for the Mk/Ery/DC
-cell-surface markers, and scRNA-seq distinguishes these populations
-better. - Some of the clusters are likely doublets, which have low
-confidence classifier calls in both the scRNA-seq and ADT methods.
-(However, scRNA-seq could have more features for more confident doublet
-identification and removal.)
+contrast are:
+
+- ADT clustering is improves CD4/CD8 T cell group distinction, based on
+  the robust ADT data for CD4, CD8, CD14, and CD45RA
+- However, ADT-based clustering is worse for the Mk/Ery/DC cell-surface
+  markers, and scRNA-seq distinguishes these populations better.
+- Some of the clusters are likely doublets, which have low confidence
+  classifier calls in both the scRNA-seq and ADT methods. (However,
+  scRNA-seq could have more features for more confident doublet
+  identification and removal.)
